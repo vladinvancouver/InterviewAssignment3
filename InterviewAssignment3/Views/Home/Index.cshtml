@@ -1,0 +1,13 @@
+﻿@model InterviewAssignment3.ViewModels.UserInfo
+@{
+    ViewData["Title"] = "QA Engineer Interview Assignment";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<ol class="breadcrumb">
+    <li class="breadcrumb-item active">Home</li>
+</ol>
+
+<ul class="list-group">
+    <li class="list-group-item"><a href="~/Profiles?userId=@(Model.UserId)"><i class="fas fa-user"></i> Edit profile</a></li>
+</ul>

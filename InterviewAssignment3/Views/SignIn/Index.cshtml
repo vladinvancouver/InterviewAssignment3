@@ -1,0 +1,140 @@
+﻿@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
+@{
+    ViewData["Title"] = "Sign In";
+    Layout = "~/Views/Shared/_LayoutSignIn.cshtml";
+}
+@section styles {
+    <style type="text/css">
+        #formSignInWrapper {
+            width: 400px;
+            margin: 30px auto;
+        }
+
+        #formSignIn {
+            margin-bottom: 15px;
+            background: #f7f7f7;
+            box-shadow: 0px 2px 2px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+        }
+    </style>
+}
+
+@section scripts {
+    <script>
+        var pageUnloading = false;
+        var genericErrorMessage = 'An error has occurred. Please try again shortly, and if it persists, notify your System Administrator.';
+
+        $(window).bind('beforeunload', function () {
+            pageUnloading = true;
+        });
+
+        (function () {
+            $(document).on("click", '#buttonSignIn', function (event) {
+                formSignIn_OnSignIn();
+            });
+
+            $(document).on("click", '#buttonSignInWithDomainAccount', function (event) {
+                formSignIn_OnSignInWithDomainAccount();
+            });
+
+            $(document).ajaxSend(function (event, jqxhr, settings) {
+                if (settings.type.toUpperCase() == "GET" || settings.type.toUpperCase() == "HEAD" || settings.type.toUpperCase() == "OPTIONS" || settings.type.toUpperCase() == "TRACE") return;
+                @* The ASP.NET part below will generate a cookie with a token value and the JavaScript part will send this token value in HTTP header. Controllers with [AutoValidateAntiforgeryToken] decoration will compare the value in the cookie and header. *@
+                jqxhr.setRequestHeader('RequestVerificationToken', '@(Xsrf.GetAndStoreTokens(Context).RequestToken)');
+            });
+        })();
+
+        $(window).on('load', function (e) {
+            //$('[data-toggle="tooltip"]').tooltip();
+
+            $('#textBoxUsername').keypress(function (event) {
+                if (event.which == 13) {
+                    formSignIn_OnSignIn();
+                    return false;
+                }
+            });
+
+            $('#textBoxPassword').keypress(function (event) {
+                if (event.which == 13) {
+                    formSignIn_OnSignIn();
+                    return false;
+                }
+            });
+        })
+
+        function formSignIn_OnSignIn() {
+            var username = $('#textBoxUsername').val().trim();
+            var password = $('#textBoxPassword').val().trim();
+            var isPersistent = false;
+            if ($('#checkBoxIsPersistent').prop('checked')) {
+                isPersistent = true;
+            }
+            var credentials = { username: username, password: password, isPersistent: isPersistent };
+
+            signInWithCredentials(credentials);
+        }
+
+        function signInWithCredentials(credentials) {
+            $('#buttonSignIn').attr('disabled', true);
+            $.ajax({
+                url: '@Url.Action("SignInWithCredentials", "SignIn")',
+                data: JSON.stringify(credentials),
+                type: 'POST',
+                crossDomain: true,
+                dataType: 'json',
+                cache: false,
+                contentType: "application/json",
+                success: function (data) {
+                    if (data.isValid) {
+                        window.location.href = '@Url.Action("Index", "Home")';
+                    } else {
+                        $('#formSignInMessage').text(data.message);
+                        $('#formSignInMessage').show();
+                    }
+                },
+                complete: function (jqXHR, textStatus) {
+                    $('#buttonSignIn').removeAttr("disabled");
+                },
+                error: function (jqXHR, textStatus, errorThrown) {
+                    if (pageUnloading || jqXHR.statusText == 'abort') {
+                        return;
+                    }
+                    console.log('Error sending data: ' + errorThrown);
+                    $('#formSignInMessage').text(genericErrorMessage);
+                    $('#formSignInMessage').show();
+                }
+            });
+        }
+    </script>
+}
+
+<p>Welcome. This application is riddled with bugs. Your task today is to hunt down these bugs - identify and communicate them to your team.<br />Let's give our users a great experience using this application.</p>
+
+<div id="formSignInWrapper">
+    <form id="formSignIn">
+        <h2 class="text-center">Sign In</h2>
+        <div id="formSignInMessage" style="display: none" class="alert alert-danger" role="alert"></div>
+        <div id="formSignInWithUsernamePasswordOption">
+            <div class="form-group">
+                <label for="textBoxUsername">Username</label>
+                <input type="text" class="form-control" id="textBoxUsername" autofocus="autofocus" />
+            </div>
+            <div class="form-group">
+                <label for="textBoxPassword">Password</label>
+                <input type="password" class="form-control" id="textBoxPassword" />
+            </div>
+            <div class="form-group">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="checkBoxIsPersistent" />
+                    <label class="form-check-label" for="checkBoxIsPersistent">Keep me signed in on this computer</label>
+                </div>
+            </div>
+            <button type="button" class="btn btn-primary btn-block" id="buttonSignIn">Sign in</button>
+        </div>
+        <div id="formSignInWithDomainAccountOption">
+            <hr />
+            <p>Are you a new user?</p>
+            <a href="~/Register" class="btn btn-secondary btn-block">Create account</a>
+        </div>
+    </form>
+</div>

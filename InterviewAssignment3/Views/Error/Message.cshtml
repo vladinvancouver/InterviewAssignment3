@@ -1,0 +1,16 @@
+﻿@model InterviewAssignment3.ViewModels.ErrorInfo
+
+@{
+    ViewData["Title"] = "Error";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="@Url.Action("Index", "Home")">Home</a></li>
+    <li class="breadcrumb-item active">Error</li>
+</ol>
+
+<div id="content">
+    <h1 class="display-4">Error</h1>
+    <p>@Model.Message</p>
+</div>

@@ -1,0 +1,154 @@
+﻿@model InterviewAssignment3.ViewModels.UserInfo
+@{
+    ViewData["Title"] = "Profile";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+@section scripts {
+    <script>
+        var pageUnloading = false;
+        var userId = '@(Model.UserId)';
+
+        $(window).bind('beforeunload', function () {
+            pageUnloading = true;
+        });
+
+        (function () {
+            $(document).on("click", '#buttonSave', function (event) {
+                formProfile_OnSave();
+            });
+        })();
+
+        $(window).on('load', function (e) {
+            $('[data-toggle="tooltip"]').tooltip();
+
+            loadData();
+        })
+
+        function loadData() {
+            getProfile();
+        }
+
+        function getProfile() {
+            $.ajax({
+                url: '@Url.Action("GetCompleteProfile", "Profiles")' + '?' + $.param({ userId: userId }),
+                data: {
+
+                },
+                type: 'GET',
+                crossDomain: true,
+                dataType: 'json',
+                cache: false,
+                contentType: "application/json",
+                success: function (data) {
+                    populateFormProfile(data);
+                },
+                complete: function (jqXHR, textStatus) {
+
+                },
+                error: function (jqXHR, textStatus, errorThrown) {
+                    if (pageUnloading || jqXHR.statusText == "abort") {
+                        return;
+                    }
+                    if (jqXHR.status === 400) {
+                        alert('Error: ' + jqXHR.responseText);
+                    } else {
+                        alert('Error sending data: ' + errorThrown);
+                    }
+                }
+            });
+        }
+
+        function saveProfile(profile) {
+            $('#buttonSave').attr('disabled', true);
+            $.ajax({
+                url: '@Url.Action("SaveEmailProfile", "Profiles")',
+                data: JSON.stringify(profile),
+                type: 'PUT',
+                crossDomain: true,
+                dataType: 'text',
+                cache: false,
+                contentType: "application/json",
+                success: function (data) {
+                    window.location.href = '@Url.Action("Index", "Profiles")' + '?' + $.param({ userId: userId });
+                },
+                complete: function (jqXHR, textStatus) {
+                    $('#buttonSave').removeAttr("disabled");
+                },
+                error: function (jqXHR, textStatus, errorThrown) {
+                    if (pageUnloading || jqXHR.statusText == 'abort') {
+                        return;
+                    }
+                    if (jqXHR.status === 400) {
+                        alert('Error: ' + jqXHR.responseText);
+                    } else {
+                        alert('Error sending data: ' + errorThrown);
+                    }
+                }
+            });
+        }
+
+        function populateFormProfile(profile) {
+            $('#existingEmailAddress').text('Your current email address is: ');
+            let $email = $('<strong>');
+            if (profile.unconfirmedEmailAddress.length > 0) {
+                $email.text(profile.unconfirmedEmailAddress);
+            } else {
+                $email.text(profile.emailAddress);
+            }
+            $('#existingEmailAddress').append($email);
+            $('#textBoxNewEmailAddress').val('');
+            $('#textBoxReEnteredEmailAddress').val('');
+        }
+
+        function formProfile_OnSave() {
+            let newEmailAddress = $('#textBoxNewEmailAddress').val().trim();
+            let reEnteredEmailAddress = $('#textBoxReEnteredEmailAddress').val().trim();
+
+            if (newEmailAddress == '') {
+                alert('"Email address" cannot not be left blank.');
+                return;
+            }
+
+            if (newEmailAddress.length > 100) {
+                alert('"Email address" must not be longer than 100 characters.');
+                return;
+            }
+
+            if (newEmailAddress != reEnteredEmailAddress) {
+                alert('The email addresses entered do not match.');
+                return;
+            }
+
+            let profile = { userId: userId, newEmailAddress: newEmailAddress, reEnteredEmailAddress: reEnteredEmailAddress };
+
+            saveProfile(profile);
+        }
+    </script>
+}
+
+<ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="~/">Home</a></li>
+    <li class="breadcrumb-item"><a href="~/Profile?user=@(Model.UserId)">Profile</a></li>
+    <li class="breadcrumb-item active">Change email address</li>
+</ol>
+
+<div id="content">
+    <p id="existingEmailAddress"></p>
+    <form>
+        <div class="modal-body">
+            <div class="mb-3">
+                <label for="textBoxNewEmailAddress">New email address</label>
+                <input type="text" class="form-control" id="textBoxNewEmailAddress">
+            </div>
+            <div class="mb-3">
+                <label for="textBoxReEnteredEmailAddress">Re-enter new email address</label>
+                <input type="text" class="form-control" id="textBoxReEnteredEmailAddress">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-primary" id="buttonSave">Save</button>
+            <a href="~/Profiles?userId=@(Model.UserId)" class="btn btn-link">Cancel</a>
+        </div>
+    </form>
+</div>
