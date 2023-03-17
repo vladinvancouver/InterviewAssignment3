@@ -29,7 +29,6 @@ using Microsoft.AspNetCore.Identity;
 using Pipeline.BackgroundServices;
 using InterviewAssignment3.Common.Services;
 
-
 //Examples: https://docs.microsoft.com/en-us/aspnet/core/migration/50-to-60-samples?view=aspnetcore-6.0
 
 
