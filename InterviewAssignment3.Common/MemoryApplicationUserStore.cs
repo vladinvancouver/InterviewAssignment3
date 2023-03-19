@@ -8,18 +8,23 @@ using System.Threading.Tasks;
 
 namespace InterviewAssignment3.Common
 {
-    public class FakeApplicationUserStore : IUserStore<ApplicationUser>, IUserPasswordStore<ApplicationUser>
+    public class MemoryApplicationUserStore : IUserStore<ApplicationUser>, IUserPasswordStore<ApplicationUser>
     {
-        private List<ApplicationUser> _users;
+        private readonly List<ApplicationUser> _users;
+        private readonly object _locker = new();
 
-        public FakeApplicationUserStore(List<ApplicationUser> users)
+        public MemoryApplicationUserStore(List<ApplicationUser> users)
         {
             _users = users ?? throw new ArgumentNullException(nameof(users));
         }
 
         public async Task<IdentityResult> CreateAsync(ApplicationUser user, CancellationToken cancellationToken)
         {
-            _users.Add(user);
+            lock(_locker)
+            {
+                user.Id = (_users.Count + 1).ToString();
+                _users.Add(user);
+            }
             return await Task.FromResult(IdentityResult.Success);
         }
 

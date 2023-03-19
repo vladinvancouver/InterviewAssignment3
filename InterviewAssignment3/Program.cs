@@ -63,6 +63,17 @@ builder.Logging.AddConfiguration(builder.Configuration.GetSection("Logging"))
         loggerConfig.ArchiveFileSizeThreshold = Int64.Parse(builder.Configuration["ArchiveFileSizeThreshold"]);
     });
 
+builder.Services.Configure<IdentityOptions>(options =>
+{
+    // Default Password settings.
+    options.Password.RequireDigit = false;
+    options.Password.RequireLowercase = true;
+    options.Password.RequireNonAlphanumeric = false;
+    options.Password.RequireUppercase = true;
+    options.Password.RequiredLength = 12;
+    options.Password.RequiredUniqueChars = 1;
+});
+
 var hostingConfig = new ConfigurationBuilder()
      .AddJsonFile("hosting.json", optional: false)
      .Build();
@@ -141,7 +152,7 @@ void ConfigureServices(ConfigurationManager configuration, IServiceCollection se
     List<ApplicationUser> applicationUsers = new List<ApplicationUser>();
     services.AddScoped<IUserStore<ApplicationUser>>(serviceProvider =>
     {
-        return new FakeApplicationUserStore(applicationUsers);
+        return new MemoryApplicationUserStore(applicationUsers);
     });
 
     services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)

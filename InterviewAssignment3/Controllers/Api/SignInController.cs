@@ -106,7 +106,7 @@ namespace InterviewAssignment3.Controllers.Api
         [Route("SignInWithCredentials")]
         [AutoValidateAntiforgeryToken]
         [HttpPost]
-        public async Task<IActionResult> SignInWithCredentials([FromBody] DataTransfer.Objects.Credentials credentials)
+        public async Task<IActionResult> SignInWithCredentialsAsync([FromBody] DataTransfer.Objects.Credentials credentials)
         {
             try
             {
@@ -114,17 +114,17 @@ namespace InterviewAssignment3.Controllers.Api
 
                 if (credentials == null)
                 {
-                    return BadRequest($"Cannot read credentials.");
+                    throw new ArgumentException("Credentials cannot be read.");
                 }
 
                 if (String.IsNullOrWhiteSpace(credentials.Username))
                 {
-                    return Ok(new DataTransfer.Objects.ValidationResult() { IsValid = false, Message = "Username cannot be blank." });
+                    throw new ArgumentException("'Username' cannot be blank.");
                 }
 
                 if (String.IsNullOrWhiteSpace(credentials.Password))
                 {
-                    return Ok(new DataTransfer.Objects.ValidationResult() { IsValid = false, Message = "Password cannot be blank." });
+                    throw new ArgumentException("'Password' cannot be blank.");
                 }
 
                 var user = await _userManager.FindByNameAsync(credentials.Username);
@@ -133,14 +133,14 @@ namespace InterviewAssignment3.Controllers.Api
                 {
                     //We do not want to reveal to the user that the username does not exist.
                     _logger.LogInformation($"Cannot find user account for username '{credentials.Username}'. Username was manually entered.");
-                    return Ok(new DataTransfer.Objects.ValidationResult() { IsValid = false, Message = genericMessageUnableToSignIn });
+                    throw new ArgumentException(genericMessageUnableToSignIn);
                 }
 
                 if (!user.IsAccountEnabled)
                 {
                     //We do not want to reveal to the user that the account is not enabled.
                     _logger.LogInformation($"Account is not enabled for username '{credentials.Username}'.");
-                    return Ok(new DataTransfer.Objects.ValidationResult() { IsValid = false, Message = genericMessageUnableToSignIn });
+                    throw new ArgumentException(genericMessageUnableToSignIn);
                 }
 
                 //Note, it is important to let users know that their account is locked out. But this message can be used by hackers to
@@ -148,7 +148,7 @@ namespace InterviewAssignment3.Controllers.Api
                 if (user.IsAccountLockedOut)
                 {
                     _logger.LogInformation($"Account is locked out for username '{credentials.Username}'.");
-                    return Ok(new DataTransfer.Objects.ValidationResult() { IsValid = false, Message = "Your account is locked out. This may occur if there were several failed login attempts. Wait a while and try again. If this persists, please contact your System Administrator." });
+                    throw new ArgumentException("Your account is locked out. This may occur if there were several failed login attempts. Wait a while and try again. If this persists, please contact your System Administrator.");
                 }
 
                 if (await _userManager.CheckPasswordAsync(user, credentials.Password))
@@ -166,11 +166,106 @@ namespace InterviewAssignment3.Controllers.Api
                         });
 
                     _logger.LogInformation($"Successful sign in with username / password for username '{credentials.Username}'.");
-                    return Ok(new DataTransfer.Objects.ValidationResult() { IsValid = true, Message = "Successul sign in." });
+                    return Ok();
                 }
 
                 _logger.LogInformation($"Failed sign in attempt for username '{credentials.Username}'. Likely cause is incorrect password.");
-                return Ok(new DataTransfer.Objects.ValidationResult() { IsValid = false, Message = genericMessageUnableToSignIn });
+                throw new ArgumentException(genericMessageUnableToSignIn);
+            }
+            catch (ArgumentException ae)
+            {
+                return BadRequest(ae.Message);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, e.Message);
+                throw;
+            }
+        }
+
+        [Route("Register")]
+        [AutoValidateAntiforgeryToken]
+        [HttpPost]
+        public async Task<IActionResult> RegisterAsync([FromBody] DataTransfer.Objects.NewUser newUser)
+        {
+            try
+            {
+                if (newUser == null)
+                {
+                    return BadRequest($"Cannot read user information.");
+                }
+
+                if (String.IsNullOrWhiteSpace(newUser.FirstName))
+                {
+                    throw new ArgumentException("'First name' cannot be blank.");
+                }
+
+                if (newUser.FirstName.Length > 100)
+                {
+                    throw new ArgumentException($"'Last name' must 100 characters or less.");
+                }
+
+                if (String.IsNullOrWhiteSpace(newUser.LastName))
+                {
+                    throw new ArgumentException("'Last name' cannot be blank.");
+                }
+
+                if (newUser.FirstName.Length > 100)
+                {
+                    throw new ArgumentException($"'Last name' must 100 characters or less.");
+                }
+
+                if (String.IsNullOrWhiteSpace(newUser.Username))
+                {
+                    throw new ArgumentException("'Username' cannot be blank.");
+                }
+
+                if (newUser.Username.Length > 100)
+                {
+                    throw new ArgumentException($"'Last name' must 100 characters or less.");
+                }
+
+                if (String.IsNullOrWhiteSpace(newUser.Password))
+                {
+                    throw new ArgumentException("'Password' cannot be blank.");
+                }
+
+                if (newUser.Password.Length > 100)
+                {
+                    throw new ArgumentException($"'Last name' must 100 characters or less.");
+                }
+
+                ApplicationUser applicationUser = new()
+                {
+                    UserName = newUser.Username,
+                    FirstName = newUser.FirstName,
+                    LastName = newUser.LastName,
+                    EmailAddress = String.Empty,
+                    Phone = String.Empty,
+                    Street = String.Empty,
+                    City = String.Empty,
+                    Region = String.Empty,
+                    Postal = String.Empty,
+                    Country = String.Empty,
+                    IsAccountEnabled = true
+                };
+                IdentityResult identityResult = await _userManager.CreateAsync(applicationUser, newUser.Password);
+
+                if (!identityResult.Succeeded)
+                {
+                    string errorMessage = String.Join(' ', identityResult.Errors.Select(obj => obj.Description));
+
+                    if (String.IsNullOrWhiteSpace(errorMessage))
+                    {
+                        throw new ArgumentException("Failed to register. Please try again.");
+                    }
+                    else
+                    {
+                        throw new ArgumentException(errorMessage);
+                    }
+                }
+
+                return Ok();
             }
             catch (ArgumentException ae)
             {

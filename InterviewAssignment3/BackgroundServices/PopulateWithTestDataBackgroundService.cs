@@ -42,7 +42,6 @@ namespace Pipeline.BackgroundServices
 
                     ApplicationUser applicationUser1 = new()
                     {
-                        Id = 1.ToString(),
                         UserName = "john.smith",
                         FirstName = "John",
                         LastName = "Smith",
@@ -68,7 +67,6 @@ namespace Pipeline.BackgroundServices
 
                     ApplicationUser applicationUser2 = new()
                     {
-                        Id = 2.ToString(),
                         UserName = "MeeraBall",
                         FirstName = "Meera",
                         LastName = "Ball",
