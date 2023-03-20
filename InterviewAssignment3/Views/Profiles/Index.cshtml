@@ -79,6 +79,13 @@
 <div id="content">
     <div class="card" style="width:100%;margin-bottom:10px;">
         <div class="card-body">
+            <h5 class="card-title">Username</h5>
+            <p class="card-text" id="usernameProfile">Your username is <strong>@(User.Identity.Name)</strong>. Your username cannot not be changed.</p>
+        </div>
+    </div>
+
+    <div class="card" style="width:100%;margin-bottom:10px;">
+        <div class="card-body">
             <h5 class="card-title">Change password</h5>
             <p class="card-text" id="passwordProfile"></p>
             <a href="~/Profiles/Password?userId=@(Model.UserId)" class="card-link">Edit</a>

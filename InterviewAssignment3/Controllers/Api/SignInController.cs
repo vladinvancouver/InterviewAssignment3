@@ -9,6 +9,7 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using InterviewAssignment3.Common;
 using InterviewAssignment3.Common.Objects;
+using InterviewAssignment3.DataTransfer.Objects;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
@@ -26,82 +27,34 @@ namespace InterviewAssignment3.Controllers.Api
     {
         private readonly ILogger _logger;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly List<ApplicationUser> _applicationUsers;
 
-        public SignInController(ILogger<SignInController> logger, UserManager<ApplicationUser> userManager)
+        public SignInController(ILogger<SignInController> logger, UserManager<ApplicationUser> userManager, List<ApplicationUser> applicationUsers)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
+            _applicationUsers = applicationUsers ?? throw new ArgumentNullException(nameof(applicationUsers));
         }
 
-//#if DEBUG
-        //[Route("Register")]
-        //[HttpGet]
-        //public async Task<IActionResult> Register()
-        //{
-        //    //This method is for testing only
-        //    if (System.Diagnostics.Debugger.IsAttached || System.Net.IPAddress.IsLoopback(Request.HttpContext.Connection.RemoteIpAddress))
-        //    {
-        //        Models.DeltaUser applicationUser1 = new Models.DeltaUser()
-        //        {
-        //            Id = Guid.NewGuid().ToString(),
-        //            UserName = "1234567",
-        //            DisplayName = "Vlad 'Principal' Alexander",
-        //            IsAccountEnabled = true
-        //        };
-        //        string password1 = "Hello101$";
-        //        IdentityResult identityResult1 = await _userManager.CreateAsync(applicationUser1, password1);
-
-        //        if (!identityResult1.Succeeded)
-        //        {
-        //            return Ok(identityResult1.Errors);
-        //        }
-
-        //        Models.DeltaUser applicationUser2 = new Models.DeltaUser()
-        //        {
-        //            Id = Guid.NewGuid().ToString(),
-        //            UserName = "7654321",
-        //            DisplayName = "Vlad 'Manager' Alexander",
-        //            IsAccountEnabled = true
-        //        };
-        //        string password2 = "Hello101$";
-        //        IdentityResult identityResult2 = await _userManager.CreateAsync(applicationUser2, password2);
-
-        //        if (!identityResult2.Succeeded)
-        //        {
-        //            return Ok(identityResult2.Errors);
-        //        }
-
-
-        //        return Ok("Done");
-        //    }
-        //    else
-        //    {
-        //        return BadRequest("This method is for testing only.");
-        //    }
-        //}
-
-        //[Route("Clear")]
-        //[HttpGet]
-        //public async Task<IActionResult> Clear()
-        //{
-        //    if (System.Diagnostics.Debugger.IsAttached || System.Net.IPAddress.IsLoopback(Request.HttpContext.Connection.RemoteIpAddress))
-        //    {
-        //        Models.DeltaUser applicationUser1 = await _userManager.FindByNameAsync("1234567");
-        //        if (applicationUser1 != null)
-        //            await _userManager.DeleteAsync(applicationUser1);
-
-        //        Models.DeltaUser applicationUser2 = await _userManager.FindByNameAsync("7654321");
-        //        if (applicationUser2 != null)
-        //            await _userManager.DeleteAsync(applicationUser2);
-
-        //        return Ok("Done");
-        //    }
-        //    else
-        //    {
-        //        return BadRequest("This method is for testing only.");
-        //    }
-        //}
-//#endif
+        [Route("Reset")]
+        [HttpGet]
+        public async Task<IActionResult> ResetAsync()
+        {
+            try
+            {
+                await BugRules.ResetUsersAsync(_logger, _userManager, _applicationUsers);
+                return Ok();
+            }
+            catch (ArgumentException ae)
+            {
+                return BadRequest(ae.Message);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, e.Message);
+                throw;
+            }
+        }
 
         [Route("SignInWithCredentials")]
         [AutoValidateAntiforgeryToken]
@@ -238,8 +191,8 @@ namespace InterviewAssignment3.Controllers.Api
                 ApplicationUser applicationUser = new()
                 {
                     UserName = newUser.Username,
-                    FirstName = newUser.FirstName,
-                    LastName = newUser.LastName,
+                    FirstName = BugRules.RemoveUnicodeCharacters(newUser.FirstName),
+                    LastName = BugRules.RemoveUnicodeCharacters(newUser.LastName),
                     EmailAddress = String.Empty,
                     Phone = String.Empty,
                     Street = String.Empty,

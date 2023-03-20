@@ -70,7 +70,7 @@ builder.Services.Configure<IdentityOptions>(options =>
     options.Password.RequireLowercase = true;
     options.Password.RequireNonAlphanumeric = false;
     options.Password.RequireUppercase = true;
-    options.Password.RequiredLength = 12;
+    options.Password.RequiredLength = 8;
     options.Password.RequiredUniqueChars = 1;
 });
 
@@ -150,6 +150,7 @@ void ConfigureServices(ConfigurationManager configuration, IServiceCollection se
     services.AddIdentityCore<ApplicationUser>(options => { });
 
     List<ApplicationUser> applicationUsers = new List<ApplicationUser>();
+    services.AddSingleton(typeof(List<ApplicationUser>), applicationUsers);
     services.AddScoped<IUserStore<ApplicationUser>>(serviceProvider =>
     {
         return new MemoryApplicationUserStore(applicationUsers);

@@ -1,11 +1,11 @@
-
 Some parts of the application can expose other user's data through URL hacking / API calls.
 
-No email address or phone number format validation.
-
-The "Primary contact details" form does not save data in the City field.
+The "Primary contact details" form does not save data correctly in the City field.
 
 Unicode characters are not saved.
 
 Links in some breadcrumbs as broken.
 
+On the Register screen, instructions on password length are incorrect.
+
+There is a typo on the Profiles screen.

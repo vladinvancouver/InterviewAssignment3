@@ -216,7 +216,7 @@ namespace InterviewAssignment3.Controllers.Api
                 user.Phone = BugRules.RemoveUnicodeCharacters(profile.Phone);
                 user.Street = BugRules.RemoveUnicodeCharacters(profile.Street);
                 //Bug
-                //user.City = BugRules.RemoveUnicodeCharacters((profile.City);
+                user.City = BugRules.RemoveUnicodeCharacters(profile.Country);
                 user.Region = BugRules.RemoveUnicodeCharacters(profile.Region);
                 user.Postal = BugRules.RemoveUnicodeCharacters(profile.Postal);
                 user.Country = BugRules.RemoveUnicodeCharacters(profile.Country);

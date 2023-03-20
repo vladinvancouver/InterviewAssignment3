@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -17,11 +18,13 @@ namespace Pipeline.BackgroundServices
     {
         private readonly ILogger _logger;
         private readonly IServiceProvider _serviceProvider;
+        private readonly List<ApplicationUser> _applicationUsers;
 
-        public PopulateWithTestDataBackgroundService(ILogger<PopulateWithTestDataBackgroundService> logger, IServiceProvider serviceProvider)
+        public PopulateWithTestDataBackgroundService(ILogger<PopulateWithTestDataBackgroundService> logger, IServiceProvider serviceProvider, List<ApplicationUser> applicationUsers)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+            _applicationUsers = applicationUsers ?? throw new ArgumentNullException(nameof(applicationUsers));
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -40,55 +43,7 @@ namespace Pipeline.BackgroundServices
                     UserManager<ApplicationUser> userManager =
                         scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
 
-                    ApplicationUser applicationUser1 = new()
-                    {
-                        UserName = "john.smith",
-                        FirstName = "John",
-                        LastName = "Smith",
-                        EmailAddress = "john.smith@gmail.com",
-                        Phone = "416-467-2800",
-                        Street = "1201 Bathurst St.",
-                        City = "Toronto",
-                        Region = "ON",
-                        Postal = "M4B 0A3",
-                        Country = "Canada",
-                        IsAccountEnabled = true
-                    };
-                    string password1 = "Welcome$1";
-                    IdentityResult identityResult1 = await userManager.CreateAsync(applicationUser1, password1);
-
-                    if (!identityResult1.Succeeded)
-                    {
-                        foreach (IdentityError identityError in identityResult1.Errors)
-                        {
-                            _logger.LogError(identityError.Description);
-                        }
-                    }
-
-                    ApplicationUser applicationUser2 = new()
-                    {
-                        UserName = "MeeraBall",
-                        FirstName = "Meera",
-                        LastName = "Ball",
-                        EmailAddress = "MeeraBall@yahoo.com",
-                        Phone = "206-521-1380",
-                        Street = "Market Ave.",
-                        City = "Seattle",
-                        Region = "WA",
-                        Postal = "98101",
-                        Country = "United States",
-                        IsAccountEnabled = true
-                    };
-                    string password2 = "Hello$1";
-                    IdentityResult identityResult2 = await userManager.CreateAsync(applicationUser2, password2);
-
-                    if (!identityResult2.Succeeded)
-                    {
-                        foreach (IdentityError identityError in identityResult1.Errors)
-                        {
-                            _logger.LogError(identityError.Description);
-                        }
-                    }
+                    await BugRules.ResetUsersAsync(_logger, userManager, _applicationUsers);
                 }
             }
             catch (Exception e)
