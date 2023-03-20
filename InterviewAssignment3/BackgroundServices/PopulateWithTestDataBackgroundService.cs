@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 namespace Pipeline.BackgroundServices
 {
     /// <summary>
-    /// This classs checks for feature support the application depends on.
+    /// This service creates demo users/login accounts.
     /// </summary>
     public class PopulateWithTestDataBackgroundService : BackgroundService
     {
