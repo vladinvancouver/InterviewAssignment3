@@ -18,7 +18,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Hosting.WindowsServices;
 using Microsoft.Extensions.Logging;
 using InterviewAssignment3.Middleware;
 using InterviewAssignment3.Common.Objects;
@@ -28,85 +27,61 @@ using InterviewAssignment3.Common;
 using Microsoft.AspNetCore.Identity;
 using Pipeline.BackgroundServices;
 using InterviewAssignment3.Common.Services;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 
-//Examples: https://docs.microsoft.com/en-us/aspnet/core/migration/50-to-60-samples?view=aspnetcore-6.0
+ILogger _logger = CreateBootstrapLogger(args);
 
-
-//Using DEBUG directives for now because static content not loading when launching from Visual Studio.
-
-
-//UseWindowsService() sets ContentRootPath. Changing this value after the builder is created
-//causes an error. So we need to set the ContentRootPath to the same value that UseWindowsService
-//sets it to in order to avoid the error.
-WebApplicationOptions webApplicationOptions = new()
+try
 {
-    ContentRootPath = AppContext.BaseDirectory,
-    Args = args,
-    ApplicationName = System.Diagnostics.Process.GetCurrentProcess().ProcessName
-};
+    WebApplicationBuilder builder = WebApplication.CreateBuilder();
 
-#if DEBUG
-    var builder = WebApplication.CreateBuilder();
-#else
-    var builder = WebApplication.CreateBuilder(webApplicationOptions);
-#endif
+    builder.Logging.ClearProviders();
+    builder.Logging.AddConfiguration(builder.Configuration.GetSection("Logging"))
+        .AddConsole()
+        .AddFileLogger(loggerConfig =>
+        {
+            loggerConfig.LogFilePath = builder.Configuration["LogFilePath"] ?? throw new ArgumentNullException("Configuration 'LogFilePath' is missing.");
+            loggerConfig.ArchiveDirectoryPath = builder.Configuration["ArchiveDirectoryPath"] ?? throw new ArgumentNullException("Configuration 'ArchiveDirectoryPath' is missing.");
+            loggerConfig.ArchiveFileName = builder.Configuration["ArchiveFileName"] ?? throw new ArgumentNullException("Configuration 'ArchiveFileName' is missing.");
+            loggerConfig.ArchiveInterval = builder.Configuration["ArchiveInterval"] ?? throw new ArgumentNullException("Configuration 'ArchiveInterval' is missing.");
+            loggerConfig.ArchiveFileSizeThreshold = Int64.Parse(builder.Configuration["ArchiveFileSizeThreshold"] ?? throw new ArgumentNullException("Configuration 'ArchiveFileSizeThreshold' is missing."));
+        });
 
-builder.Logging.ClearProviders();
-builder.Logging.AddConfiguration(builder.Configuration.GetSection("Logging"))
-    .AddConsole()
-    .AddFileLogger(loggerConfig =>
+    builder.Services.Configure<IdentityOptions>(options =>
     {
-        loggerConfig.LogFilePath = builder.Configuration["LogFilePath"];
-        loggerConfig.ArchiveDirectoryPath = builder.Configuration["ArchiveDirectoryPath"];
-        loggerConfig.ArchiveFileName = builder.Configuration["ArchiveFileName"];
-        loggerConfig.ArchiveInterval = builder.Configuration["ArchiveInterval"];
-        loggerConfig.ArchiveFileSizeThreshold = Int64.Parse(builder.Configuration["ArchiveFileSizeThreshold"]);
+        // Default Password settings.
+        options.Password.RequireDigit = false;
+        options.Password.RequireLowercase = true;
+        options.Password.RequireNonAlphanumeric = false;
+        options.Password.RequireUppercase = true;
+        options.Password.RequiredLength = 8;
+        options.Password.RequiredUniqueChars = 1;
     });
 
-builder.Services.Configure<IdentityOptions>(options =>
+    var hostingConfig = new ConfigurationBuilder()
+         .AddJsonFile("hosting.json", optional: false)
+         .Build();
+
+    ConfigureConfiguration(builder.Configuration);
+    ConfigureServices(builder.Configuration, builder.Services);
+
+    _logger.LogInformation("Preparing the runtime environment.");
+    WebApplication app = builder.Build();
+
+    _logger = app.Services.GetRequiredService<ILogger<Program>>();
+
+    ConfigureLifetime(_logger, app, app.Lifetime);
+    ConfigureMiddleware(_logger, app, app.Services, app.Environment);
+    ConfigureEndpoints(_logger, app, app.Services);
+
+    _logger.LogInformation("Running the application.");
+    app.Run();
+}
+catch (Exception e)
 {
-    // Default Password settings.
-    options.Password.RequireDigit = false;
-    options.Password.RequireLowercase = true;
-    options.Password.RequireNonAlphanumeric = false;
-    options.Password.RequireUppercase = true;
-    options.Password.RequiredLength = 8;
-    options.Password.RequiredUniqueChars = 1;
-});
-
-var hostingConfig = new ConfigurationBuilder()
-     .AddJsonFile("hosting.json", optional: false)
-     .Build();
-
-string urls = hostingConfig.GetValue<string>("urls");
-
-#pragma warning disable CA1416 // Validate platform compatibility
-
-#if !DEBUG
-builder.Host.UseWindowsService();
-#endif
-
-
-builder.WebHost.UseHttpSys(options =>
-    {
-        ConfigureHttpSys(options);
-    })
-    .UseConfiguration(hostingConfig);  //Will read "urls" key from hosting.json
-#pragma warning restore CA1416 // Validate platform compatibility
-
-ConfigureConfiguration(builder.Configuration);
-ConfigureServices(builder.Configuration, builder.Services);
-
-var app = builder.Build();
-
-Microsoft.Extensions.Logging.ILogger logger = app.Services.GetRequiredService<ILogger<Program>>();
-logger.LogInformation($"Starting web server on {urls}");
-
-ConfigureLifetime(logger, app, app.Lifetime);
-ConfigureMiddleware(logger, app, app.Services, app.Environment);
-ConfigureEndpoints(logger, app, app.Services);
-
-app.Run();
+    _logger.LogError(e, e.Message);
+    throw;
+}
 
 void ConfigureConfiguration(ConfigurationManager configuration)
 {
@@ -183,39 +158,43 @@ void ConfigureServices(ConfigurationManager configuration, IServiceCollection se
     };
     jsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
     services.AddSingleton(jsonSerializerOptions);
-
-    //var repositoryInterfaceTypeToRepositoryTypeMapping = UnitOfWorkHelper.GetRepositoryInterfaceTypeToRepositoryTypeMapping(prefix: "Sql", suffix: "Repository");
-
-    ////The two connection strings need to be different so that corresponding connections are pooled separately because of an ADO bug where
-    ////some settings from transaction connections do not reset.
-    ////https://github.com/dotnet/SqlClient/issues/96
-    //string forGeneralUseConnectionStringKey = "ForGeneralUse";
-    //string forUseWithTransactionsConnectionStringKey = "ForUseWithTransactions";
-    //string forGeneralUseConnectionString = Microsoft.Extensions.Configuration.ConfigurationExtensions.GetConnectionString(configuration, forGeneralUseConnectionStringKey);
-    //string forUseWithTransactionsConnectionString = Microsoft.Extensions.Configuration.ConfigurationExtensions.GetConnectionString(configuration, forUseWithTransactionsConnectionStringKey);
-
-    //if (forGeneralUseConnectionString == forUseWithTransactionsConnectionString)
-    //{
-    //    throw new Exception($"Connection string '{forGeneralUseConnectionStringKey}' must be different than '{forUseWithTransactionsConnectionStringKey}' so that a different connection pool will be created for each connection string.");
-    //}
-
-    //services.AddSingleton(serviceProvider =>
-    //{
-    //    IUnitOfWork forGeneralUseUnitOfWork = new SqlUnitOfWork(serviceProvider, forGeneralUseConnectionString, repositoryInterfaceTypeToRepositoryTypeMapping) { WarningThresholdInMilliseconds = configSettings.DatabaseExecutionDurationWarningThresholdInMilliseconds };
-    //    IUnitOfWork forUseWithTransactionsUnitOfWork = new SqlUnitOfWork(serviceProvider, forUseWithTransactionsConnectionString, repositoryInterfaceTypeToRepositoryTypeMapping);
-    //    InterviewAssignment3.DataAccess.Storage storage = new InterviewAssignment3.DataAccess.Storage(forGeneralUseUnitOfWork, forUseWithTransactionsUnitOfWork, configSettings.MachineAffinitiesCacheExpirationInSeconds, configSettings.ExecutingCommandsCacheExpirationInSeconds);
-    //    return storage;
-    //});
-
     services.AddSingleton<IHostedService, PopulateWithTestDataBackgroundService>();
     services.AddSingleton(new EnvironmentService() { MachineName = System.Environment.MachineName, ProcessName = Process.GetCurrentProcess().ProcessName, ProcessId = Process.GetCurrentProcess().Id, RunningAsUser = $@"{System.Environment.UserDomainName}\{System.Environment.UserName}" });
 }
 
 void ConfigureLifetime(Microsoft.Extensions.Logging.ILogger logger, IApplicationBuilder app, IHostApplicationLifetime appLife)
 {
-    appLife.ApplicationStarted.Register(() => ApplicationStarted(logger));
+    appLife.ApplicationStarted.Register(() => ApplicationStarted(logger, app, appLife));
     appLife.ApplicationStopping.Register(() => ApplicationStopping(logger, app));
     appLife.ApplicationStopped.Register(() => ApplicationStopped(logger));
+
+    void ApplicationStarted(Microsoft.Extensions.Logging.ILogger logger, IApplicationBuilder app, IHostApplicationLifetime appLife)
+    {
+        logger.LogInformation($"Application starting on process ID {System.Diagnostics.Process.GetCurrentProcess().Id} and name '{System.Diagnostics.Process.GetCurrentProcess().ProcessName}'");
+
+        // Access the IServiceProvider
+        IServiceProvider serviceProvider = app.ApplicationServices;
+
+        IServerAddressesFeature? serverAddressesFeature = app.ServerFeatures.Get<IServerAddressesFeature>();
+        if (serverAddressesFeature is { })
+        {
+            foreach (string address in serverAddressesFeature.Addresses)
+            {
+                logger.LogInformation($"Server is running on {address}");
+            }
+        }
+    }
+
+    void ApplicationStopping(Microsoft.Extensions.Logging.ILogger logger, IApplicationBuilder app)
+    {
+        logger.LogInformation($"Application stopping on process ID {System.Diagnostics.Process.GetCurrentProcess().Id}.");
+    }
+
+
+    void ApplicationStopped(Microsoft.Extensions.Logging.ILogger logger)
+    {
+        logger.LogInformation($"Application stopped on process ID {System.Diagnostics.Process.GetCurrentProcess().Id}.");
+    }
 }
 
 void ConfigureMiddleware(ILogger logger, IApplicationBuilder app, IServiceProvider services, IWebHostEnvironment env)
@@ -262,32 +241,77 @@ void ConfigureEndpoints(ILogger logger, IEndpointRouteBuilder app, IServiceProvi
     
 }
 
-void ApplicationStarted(Microsoft.Extensions.Logging.ILogger logger)
+/// <summary>
+/// A bootstrap logger is a temporary logger you crate very early in the application lifecycle, before the full host and dependecncy incject (DI) container are built.
+/// </summary>
+static ILogger CreateBootstrapLogger(string[] args)
 {
-    logger.LogInformation($@"Application starting on process ID {Process.GetCurrentProcess().Id}, name '{Process.GetCurrentProcess().ProcessName}' and running as '{System.Environment.UserDomainName}\{System.Environment.UserName}'.");
-}
+    // This method must return some kind of logger without throwing an error.
 
-void ApplicationStopping(Microsoft.Extensions.Logging.ILogger logger, IApplicationBuilder app)
-{
-    logger.LogInformation($"Application stopping on process ID {Process.GetCurrentProcess().Id}.");
-}
-
-void ApplicationStopped(Microsoft.Extensions.Logging.ILogger logger)
-{
-    logger.LogInformation($"Application stopped on process ID {Process.GetCurrentProcess().Id}.");
-}
-
-
-void ConfigureHttpSys(Microsoft.AspNetCore.Server.HttpSys.HttpSysOptions options, string? overrideUrl = null)
-{
-    //options.Authentication.Schemes = Microsoft.AspNetCore.Server.HttpSys.AuthenticationSchemes.NTLM | Microsoft.AspNetCore.Server.HttpSys.AuthenticationSchemes.Negotiate;
-    //options.Authentication.AllowAnonymous = true;
-    options.Authentication.Schemes = Microsoft.AspNetCore.Server.HttpSys.AuthenticationSchemes.None;
-    options.Authentication.AllowAnonymous = true;
-    options.MaxConnections = -1;
-    options.MaxRequestBodySize = 100_000_000;
-    if (!String.IsNullOrWhiteSpace(overrideUrl))
+    // Try to create as lcose to fully functional logger as possible.
+    try
     {
-        options.UrlPrefixes.Add(overrideUrl);
+        string env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production";
+
+        IConfigurationRoot earlyConfiguration = new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
+            .AddJsonFile($"appsettings.{env}.json", optional: true, reloadOnChange: false)
+            .AddEnvironmentVariables()
+            .AddCommandLine(args)
+            .Build(); //same sources/order as the default builder
+
+        using ILoggerFactory loggerFactory = LoggerFactory.Create(builder =>
+        {
+            builder
+                .AddConsole()
+                .AddFileLogger(loggerConfig =>
+                {
+                    loggerConfig.LogFilePath = earlyConfiguration["LogFilePath"] ?? throw new ArgumentNullException("Configuration 'LogFilePath' is missing.");
+                    loggerConfig.ArchiveDirectoryPath = earlyConfiguration["ArchiveDirectoryPath"] ?? throw new ArgumentNullException("Configuration 'ArchiveDirectoryPath' is missing.");
+                    loggerConfig.ArchiveFileName = earlyConfiguration["ArchiveFileName"] ?? throw new ArgumentNullException("Configuration 'ArchiveFileName' is missing.");
+                    loggerConfig.ArchiveInterval = earlyConfiguration["ArchiveInterval"] ?? throw new ArgumentNullException("Configuration 'ArchiveInterval' is missing.");
+                    loggerConfig.ArchiveFileSizeThreshold = Int64.Parse(earlyConfiguration["ArchiveFileSizeThreshold"] ?? throw new ArgumentNullException("Configuration 'ArchiveFileSizeThreshold' is missing."));
+                });
+        });
+
+        return loggerFactory.CreateLogger(nameof(Program));
+    }
+    catch (Exception e)
+    {
+        Console.WriteLine($"Failed to create a fully functional bootstrap logger. Will try to create a simpler bootstrap logger. {e.Message}");
+    }
+
+    // Now, try to create a dumb down version of a logger.
+    try
+    {
+        using ILoggerFactory loggerFactory = LoggerFactory.Create(builder =>
+        {
+            builder
+                .AddConsole()
+                .AddFileLogger(loggerConfig =>
+                {
+                    loggerConfig.LogFilePath = System.IO.Path.Combine(AppContext.BaseDirectory, "log.txt");
+                    loggerConfig.ArchiveDirectoryPath = System.IO.Path.Combine(AppContext.BaseDirectory, "archive");
+                    loggerConfig.ArchiveFileName = "log.%yyyy-%%MM-%dd.txt";
+                    loggerConfig.ArchiveInterval = "Day";
+                    loggerConfig.ArchiveFileSizeThreshold = 0;
+                });
+        });
+    }
+    catch (Exception e)
+    {
+        Console.WriteLine($"Failed to create a dubm down bootstrap logger. Will try to create a simpler bootstrap logger. {e.Message}");
+    }
+
+    // At this point, just create the simplest possible logger.
+    {
+        using ILoggerFactory loggerFactory = LoggerFactory.Create(builder =>
+        {
+            builder
+                .AddConsole();
+        });
+
+        return loggerFactory.CreateLogger(nameof(Program));
     }
 }
